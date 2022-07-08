@@ -198,18 +198,18 @@ _main:
   ;
   ; How do we follow an address into memory? In assembly, you surround it with []s. Below, when we write [rcx], we're
   ; saying "we don't want the value stored in the rcx register, we want a value stored in MEMORY, and the rcx register
-  ; contains the memory address we want you to go to to grab that value."
+  ; contains the memory address of the value we want fetched."
   ;
   ; Finally, the qword part is necessary because, when we're following addresses into memory, we need to tell the
   ; computer what the size of the data we want back is. Since we're on a 64-bit system, our registers are 64 bits, so
-  ; we need to ask for a qword (a 64-bit word) back. If we only wanted ot grab 32 bits out of memory, we'd write
+  ; we need to ask for a qword (a 64-bit word) back. If we only wanted to grab 32 bits out of memory, we'd write
   ; dword [rcx] instead, and if we just wanted to grab a single byte, we'd write byte [rcx] (we'll actually see this
   ; later).
   ;
   ; So, with all that in mind, we follow rcx into memory and move the value (which is our command-line arg) into rcx so
   ; that the sys_write syscall can write it when we call .print below.
   ;
-  ; We are adding 8 to [rcx] so that we can skip 1 word, 8 bytes ahead.
+  ; We are adding 8 to [rcx] so that we can skip 4 words (quadruple word), 8 bytes ahead.
   ;
   ; This brings us to our second command line argument in memory, which is
   ; the first thing you typed in after the program.
@@ -218,7 +218,10 @@ _main:
   ; ("./uppercaser-mac.asm")
   mov rbx, qword [rcx + 8]
 
-  ; Push the memory address of our command-line arg onto the stack twice.
+  ; Push the value of our command-line arg onto the stack twice.
+  ; argv[][] is an array of arrays, so in this case, the value happens
+  ; to be another memory address.  The memory address points to
+  ; the first character of whichever command-line argument we are printing.
   ; The first one is to keep the value safe, because we need it after our function call.
   ; The second one is to pass it as an argument to .strLen.
   push rbx
