@@ -1,62 +1,51 @@
-# Uppercaser
 
-WELCOME TO THE UPPERCASER PROGRAM!!!!!
+; ==================================================================================
+; UPPERCASER
+;
+; Uppercases your command line arguments and prints them out!
+; Written as a working example of an x86 Intel syntax assembly language program
+; ==================================================================================
 
-It's the first program I've written in assembly that actually does something (other than [hello world](/code/x86-intel/hello-world/hello-world-mac.asm)). It's written in x86-64 assembly. For more information about x86-64 programs, check out the [README.md](/code/x86-intel/).
+; Assembler used: YASM
+; Assembly syntax: x86 Intel
+; CPU architecture: Intel x86-64
+; Platform architecture: FreeBSD
+; OS architecture: FreeBSD
 
-<p align="center">
-  <br />
-  <img src="https://cloud-b8fumzsy2-hack-club-bot.vercel.app/0uppercaser.png">
-  <br />
-  <span>
-    <em>
-      Uppercaser takes command line arguments that you pass it, and prints them back out on new lines uppercased. Very nice!
-    </em>
-  </span>
-</p>
+;; To run on x86-64 processor, Intel syntax:
+; yasm -f elf64 uppercaser-freebsd.asm && cc -o uppercaser-freebsd uppercaser-freebsd.o && ./uppercaser-freebsd
 
-<br />
+section .data
 
-Seeing all of this code may make you want to close this page. **Don't panic!**
+section .text
+    global main
 
-I promise you that you have the tools to understand this program now. I also think it's ok to be a little confused while you're going through it - just stick with it, get out a pencil and paper if you need to, and read all of the comments!
-
-<br />
-
-_If you'd like to skip this section and keep reading about concepts, the next section can be found [here](/guide/math/number-systems.md)._
-
-<br />
-
----
-
-<br />
-
-This is a snippet from the program, showing just the functioning code. To see the full program, check out [Uppercaser-mac.asm](/code/x86-intel/uppercaser/uppercaser-mac.asm). For more information about how to run this program, check out the [x86-64 Intel Syntax section](/code/x86-intel).
-
-<br />
-
-```asm
 ; In an x86-64 processor (System V) at the beginning of _main:
-;
-; rdi - Contains the number of command-line arguments that were passed.
-;       We'll refer to it as `argc`, which is its name in C.
-;
-; rsi - Contains the array of command-line arguments that you typed in when you ran the program.
-;       We'll refer to it as `argv[][]`, which is its name in C.
-;       This will be explained more below.
-;
-
-_main:
+; rdi - contains argc, which is the name in C for the integer number of command-line arguments that were passed.
+; rsi - contains argv[][], which is the name in C for the array of command-line arguments. This will be explained
+;       more below.
+main:
   ; As described above, rdi and rsi contain info about our command-line arguments. However, as described in
   ; https://web.stanford.edu/class/archive/cs/cs107/cs107.1222/guide/x86-64.html, these registers are "callee-owned",
   ; which means any functions we call may mess with their values and not clean them up.
   ;
+  ; Before we proceed however, it doesn't make sense to uppercase a word if there is no word!  Therefore let's call
+  ; the .exit label if no words where passed as arguments to our program (argc is equal to one).  The first argument
+  ; is our program name, so there should always be _at least one_.  Please note that the cmp and je (jump if) instruction
+  ; is discussed more later.
+  cmp rdi, 1
+  je .exit
+
   ; Let's keep their values safe by copying them into r12 and r13, which are caller-owned registers (also described in
   ; the link above). If assembly language etiquette is followed, if a function wants to use one of these registers, it
   ; must first push its value onto the stack, and then pop it back off into the register before returning. Of course,
   ; you could write a function that breaks these rules, which is part of why assembly language can be dangerous!
   mov r12, rdi ; argc
   mov r13, rsi ; argv[][]
+
+  ; Uncomment the next two lines to print the argument count
+  ; call .printNumberOfArgs
+  ; call .printNewline
 
   ; Print all arguments, separated by newlines.
   ;
@@ -70,6 +59,50 @@ _main:
 
   ; We're done! Exit our program.
   call .exit
+
+.printNumberOfArgs:
+  ; Since this is the first function we call, we know rdi still contains the number of command-line arguments that were
+  ; passed. In future functions, we won't be able to make assumptions like this, but it's okay here.
+  ;
+  ; This line converts our argument count from a single-digit integer to the ASCII representation of that number.
+  ; It works because the character '0' is 48 in the ASCII table, so if rdi contains 0, adding 48 will change it from
+  ; containing 0 to 48 ('0' in ASCII). Similarly, 1 + 48 = 49 ('1' in ASCII), 2 + 48 = 50 ('2'), etc.
+  ;
+  ; Fun experiment: try passing 9 command line arguments (which will be 10 including the executable name), then check
+  ; the ASCII table and try to figure out what happened!
+  add rdi, 48
+
+  ; Push the ASCII-converted value onto the stack so we can get a memory address for it.
+  push rdi
+
+  ; Store the value of the stack pointer (which is a MEMORY ADDRESS that currently points to our ASCII-converted
+  ; command-line args count) in rsi.
+  ;
+  ; sys_write (the system call that prints stuff to your terminal) looks in rsi for a pointer to the first character of
+  ; your string.
+  ;
+  ; Note: rsi is actually argument 2 to sys_write. Argument 1 specifies where sys_write should write _to_. See the
+  ; .print function below for more info.
+  mov rsi, rsp
+
+  ; sys_write will use this to determine how many bytes to print. Since we're only printing 1 character, we only want
+  ; to print 1 byte (8 bits).
+  mov rdx, 1
+
+  ; Print our number!
+  ; Note: call automatically pushes our caller memory address (that's us!) onto
+  ; the stack
+  ; ret is called in .print, which cleans up for us by popping our mem address off the stack
+  call .print
+
+  ; Let's clean up after ourselves. We're done with the ASCII character we pushed onto the stack for printing, so let's
+  ; dispose of it. You may be expecting to see a `pop` instruction here, but `pop` also stores the value in a register,
+  ; which we don't need to do here, since we're just disposing of it. Instead, we just add 8 to the stack pointer,
+  ; which effectively removes the top value of the stack without putting it anywhere.
+  add rsp, 8
+
+  ; Return back to _main (which is the memory address that is currently on the top of the stack).
+  ret
 
 .printNewline:
   ; 10 is the ASCII code for a newline.
@@ -112,7 +145,7 @@ _main:
   ; every time we print a command-line arg.
   ;
   ; We will start at 1 since we are skipping our first command line argument,
-  ; our program ("./uppercaser-mac.asm").
+  ; our program ("./uppercaser-freebsd.asm").
   mov rax, 1
 
   ; This is where we loop over the command-line args args!
@@ -198,30 +231,27 @@ _main:
   ;
   ; How do we follow an address into memory? In assembly, you surround it with []s. Below, when we write [rcx], we're
   ; saying "we don't want the value stored in the rcx register, we want a value stored in MEMORY, and the rcx register
-  ; contains the memory address of the value we want fetched."
+  ; contains the memory address we want you to go to to grab that value."
   ;
   ; Finally, the qword part is necessary because, when we're following addresses into memory, we need to tell the
   ; computer what the size of the data we want back is. Since we're on a 64-bit system, our registers are 64 bits, so
-  ; we need to ask for a qword (a 64-bit word) back. If we only wanted to grab 32 bits out of memory, we'd write
+  ; we need to ask for a qword (a 64-bit word) back. If we only wanted ot grab 32 bits out of memory, we'd write
   ; dword [rcx] instead, and if we just wanted to grab a single byte, we'd write byte [rcx] (we'll actually see this
   ; later).
   ;
   ; So, with all that in mind, we follow rcx into memory and move the value (which is our command-line arg) into rcx so
   ; that the sys_write syscall can write it when we call .print below.
   ;
-  ; We are adding 8 to [rcx] so that we can skip 4 words (quadruple word), 8 bytes ahead.
+  ; We are adding 8 to [rcx] so that we can skip 1 word, 8 bytes ahead.
   ;
   ; This brings us to our second command line argument in memory, which is
   ; the first thing you typed in after the program.
   ;
   ; If we didn't skip ahead, we'd also be printing out the program
-  ; ("./uppercaser-mac.asm")
+  ; ("./uppercaser-freebsd.asm")
   mov rbx, qword [rcx + 8]
 
-  ; Push the value of our command-line arg onto the stack twice.
-  ; argv[][] is an array of arrays, so in this case, the value happens
-  ; to be another memory address.  The memory address points to
-  ; the first character of whichever command-line argument we are printing.
+  ; Push the memory address of our command-line arg onto the stack twice.
   ; The first one is to keep the value safe, because we need it after our function call.
   ; The second one is to pass it as an argument to .strLen.
   push rbx
@@ -356,7 +386,6 @@ _main:
 .print:
   ; Specify that we want syscall to call sys_write.
   ; rax is used to tell the OS what syscall we want to call.
-  ; 0x200000 is used to say we are on MacOSX.
   ; 4 is used to say we want to call sys_write.
   ;
   ; Also note: it's theoretically possible that our calling function had stored a value in rax that it wanted to use,
@@ -365,7 +394,7 @@ _main:
   ; register, meaning functions are free to overwrite it without keeping it safe. If a caller wants to use the value in
   ; rax, it's up to them to put it on the stack to keep it safe before calling other functions.
   ; This is also true for rdi below!
-  mov rax, 0x2000004
+  mov rax, 4
 
   ; Set argument 1 (rdi) to stdout. This tells sys_write that we want to write to stdout.
   ; Argument 2 (the memory address of the start of the string to print) is in rsi and should've been set by the .print caller.
@@ -390,37 +419,7 @@ _main:
   ret
 
 .exit:
-  mov rax, 0x2000001 ; syscall for exit
-  mov rdi, 0         ; exit code 0
+  mov rax, 1 ; syscall for exit
+  mov rdi, 0 ; exit code 0
   syscall
-```
 
-<br />
-
----
-
-<a href="/guide/writing-code/instructions/stack.md">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://cloud-c4m75tmer-hack-club-bot.vercel.app/0back.svg">
-    <img align="left" width="70" src="https://cloud-c4m75tmer-hack-club-bot.vercel.app/0back.svg" />
-  </picture>
-</a>
-
-<p align="right">
-  <em>
-    <b>
-      <a href="/guide/math/number-systems.md">
-        I promise the math section is small →
-      </a>
-    </b>
-  </em>
-</p>
-
----
-
-<p align="center">
-  <a href="https://hackclub.com/">
-    <img width="35" src="https://cloud-l0g1cgz4b-hack-club-bot.vercel.app/0h.png"><br/>
-    Made with love by Hack Club
-  </a>
-</p>
